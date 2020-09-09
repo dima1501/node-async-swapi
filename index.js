@@ -3,44 +3,65 @@ const sortAlphabetic = require("sort-alphabetic");
 
 const request = process.argv.slice(2);
 
-if (request == 0) {
-  throw new Error("No arguments found");
-}
+const isEmptyRequest = () => {
+  if (request.length === 0) {
+    return true;
+  }
+};
 
-const finalCount = (arr) => {
+const getPersons = (results) => {
   let persons = [];
 
-  arr.map((item) => {
-    if (item) {
+  results.map((item) => {
+    if (item.results) {
       item.results.map((person) => {
         persons.push(person);
       });
     }
   });
 
-  if (persons == 0) {
-    throw new Error("No persons to show");
+  if (persons.length > 0) {
+    showResult(persons);
+  } else {
+    console.log("No persons to show");
   }
+};
 
+const getMaxMinHeight = (persons) => {
+  return persons.reduce(
+    (result, person) => {
+      result.minHeight = +person.height < +result.minHeight.height ? person : result.minHeight;
+      result.maxHeight = +person.height > +result.maxHeight.height ? person : result.maxHeight;
+      return result;
+    },
+    { minHeight: persons[0], maxHeight: persons[0] }
+  );
+};
+
+const showResult = (persons) => {
   const resultsCount = persons.length;
-  const getMinHeightPerson = persons.reduce((prev, current) => (+prev.height < +current.height ? prev : current));
-  const getMaxHeightPerson = persons.reduce((prev, current) => (+prev.height > +current.height ? prev : current));
   const personsList = sortAlphabetic(persons.map((person) => person.name));
+  const maxMinHeightPersons = getMaxMinHeight(persons);
 
   console.log(`Total count: ${resultsCount}`);
   console.log(`All: ${personsList}`);
-  console.log(`Min height: ${getMinHeightPerson.name}, ${getMinHeightPerson.height} cm`);
-  console.log(`Max height: ${getMaxHeightPerson.name}, ${getMaxHeightPerson.height} cm`);
+  console.log(`Min height: ${maxMinHeightPersons.minHeight.name}, ${maxMinHeightPersons.minHeight.height} cm`);
+  console.log(`Max height: ${maxMinHeightPersons.maxHeight.name}, ${maxMinHeightPersons.maxHeight.height} cm`);
 };
 
 async function main() {
+  if (isEmptyRequest()) {
+    throw new Error("No arguments found");
+  }
+
   const results = request.map(async (requestItem) => {
     try {
       const response = await fetch(`https://swapi.dev/api/people/?search=${requestItem}`);
       const responseJSON = await response.json();
 
       if (response.status == 404) {
-        throw new Error("Not found");
+        console.error(`Response status: ${response.status}`);
+        console.log(`No results found for '${requestItem}'`);
       }
 
       if (responseJSON.count == 0) {
@@ -50,12 +71,11 @@ async function main() {
       return responseJSON;
     } catch (err) {
       console.error(err);
+      return [];
     }
   });
 
-  Promise.all(results)
-    .then((completed) => finalCount(completed))
-    .catch((err) => console.error(err));
+  return Promise.all(results).then((results) => getPersons(results));
 }
 
 main()
